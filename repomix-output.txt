@@ -1,0 +1,845 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+src/
+  lib/
+    gameOfLife.ts
+  routes/
+    +page.svelte
+  app.d.ts
+  app.html
+.gitignore
+.npmrc
+.prettierignore
+.prettierrc
+eslint.config.js
+package.json
+README.md
+svelte.config.js
+tsconfig.json
+vite.config.ts
+
+================================================================
+Files
+================================================================
+
+================
+File: src/lib/gameOfLife.ts
+================
+export class GameOfLife {
+    private grid: number[][]; // 0: never lived, 1: alive, 2: dead
+    private rows: number;
+    private cols: number;
+  
+    constructor(rows: number, cols: number) {
+      this.rows = rows;
+      this.cols = cols;
+      this.grid = Array(rows).fill(null).map(() => Array(cols).fill(0));
+    }
+  
+    // Get the current grid
+    public getGrid(): number[][] {
+      return this.grid;
+    }
+  
+    // Set a cell state
+    public setCell(row: number, col: number, alive: boolean): void {
+      if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
+        this.grid[row][col] = alive ? 1 : 2; // If toggling, either make alive or mark as dead
+      }
+    }
+  
+    // Toggle a cell
+    public toggleCell(row: number, col: number): void {
+      if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
+        if (this.grid[row][col] === 1) {
+          // If alive, make dead
+          this.grid[row][col] = 2;
+        } else {
+          // If dead or never lived, make alive
+          this.grid[row][col] = 1;
+        }
+      }
+    }
+  
+    // Get the state of a cell
+    public getCell(row: number, col: number): number {
+      if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
+        return this.grid[row][col];
+      }
+      return 0;
+    }
+  
+    // Count live neighbors of a cell
+    private countLiveNeighbors(row: number, col: number): number {
+      let count = 0;
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          if (i === 0 && j === 0) continue;
+          const newRow = row + i;
+          const newCol = col + j;
+          if (newRow >= 0 && newRow < this.rows && newCol >= 0 && newCol < this.cols) {
+            if (this.grid[newRow][newCol] === 1) {
+              count++;
+            }
+          }
+        }
+      }
+      return count;
+    }
+  
+    // Calculate the next generation
+    public nextGeneration(): void {
+      const newGrid = Array(this.rows).fill(null).map(() => Array(this.cols).fill(0));
+  
+      for (let row = 0; row < this.rows; row++) {
+        for (let col = 0; col < this.cols; col++) {
+          const liveNeighbors = this.countLiveNeighbors(row, col);
+          const currentState = this.grid[row][col];
+          
+          if (currentState === 1) {
+            // Rules 1, 2, and 3: Any live cell with 2 or 3 live neighbors survives.
+            if (liveNeighbors === 2 || liveNeighbors === 3) {
+              newGrid[row][col] = 1; // Stays alive
+            } else {
+              newGrid[row][col] = 2; // Dies
+            }
+          } else {
+            // Rule 4: Any dead cell with exactly 3 live neighbors becomes a live cell.
+            if (liveNeighbors === 3) {
+              newGrid[row][col] = 1; // Becomes alive
+            } else {
+              newGrid[row][col] = currentState; // Stays in current state (0 or 2)
+            }
+          }
+        }
+      }
+  
+      this.grid = newGrid;
+    }
+  
+    // Reset the grid (all cells to never lived state)
+    public reset(): void {
+      this.grid = Array(this.rows).fill(null).map(() => Array(this.cols).fill(0));
+    }
+  
+    // Random pattern
+    public randomize(probability: number = 0.3): void {
+      for (let row = 0; row < this.rows; row++) {
+        for (let col = 0; col < this.cols; col++) {
+          this.grid[row][col] = Math.random() < probability ? 1 : 0;
+        }
+      }
+    }
+  }
+
+================
+File: src/routes/+page.svelte
+================
+<script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import { GameOfLife } from '$lib/gameOfLife';
+
+  // Constants
+  const GRID_ROWS = 100; // Doubled from 50 to make cells smaller
+  const GRID_COLS = 160; // Doubled from 80 to make cells smaller
+  
+  // Game state
+  let game = new GameOfLife(GRID_ROWS, GRID_COLS);
+  let grid = game.getGrid();
+  let isRunning = false;
+  let interval: ReturnType<typeof setInterval> | null = null;
+  let generation = 0;
+  let speed = 150; // ms
+  
+  // Drag state
+  let isDragging = false;
+  let dragMode: number = 1; // 1 = make alive, 2 = make dead
+  
+  // Initialize the game and clean up on unmount
+  onMount(() => {
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  });
+  
+  // Toggle the game running state
+  function toggleRunning() {
+    isRunning = !isRunning;
+    
+    if (isRunning) {
+      interval = setInterval(step, speed);
+    } else if (interval) {
+      clearInterval(interval);
+      interval = null;
+    }
+  }
+  
+  // Advance one generation
+  function step() {
+    game.nextGeneration();
+    grid = game.getGrid();
+    generation++;
+  }
+  
+  // Reset the game
+  function reset() {
+    game.reset();
+    grid = game.getGrid();
+    generation = 0;
+    
+    if (isRunning) {
+      toggleRunning();
+    }
+  }
+  
+  // Randomize the grid
+  function randomize() {
+    game.randomize();
+    grid = game.getGrid();
+  }
+  
+  // Handle mouse down on a cell
+  function handleMouseDown(row: number, col: number) {
+    if (isRunning) return;
+    
+    isDragging = true;
+    const currentState = game.getCell(row, col);
+    
+    // If the cell is alive, we'll set drag mode to make cells dead,
+    // otherwise we'll set drag mode to make cells alive
+    dragMode = currentState === 1 ? 2 : 1;
+    
+    // Apply the change to the initial cell
+    game.setCell(row, col, dragMode === 1);
+    grid = game.getGrid();
+  }
+  
+  // Handle mouse move over a cell
+  function handleMouseMove(row: number, col: number) {
+    if (!isDragging || isRunning) return;
+    
+    game.setCell(row, col, dragMode === 1);
+    grid = game.getGrid();
+  }
+  
+  // Handle mouse up event
+  function handleMouseUp() {
+    isDragging = false;
+  }
+  
+  // Handle mouse leave event
+  function handleMouseLeave() {
+    isDragging = false;
+  }
+  
+  // Cell class helper
+  function getCellClass(state: number): string {
+    if (state === 1) return 'alive';
+    if (state === 2) return 'dead';
+    return '';
+  }
+  
+  // Update game speed reactively
+  $: if (isRunning && interval) {
+    clearInterval(interval);
+    interval = setInterval(step, speed);
+  }
+</script>
+
+<main>
+  <div class="title-container">
+    <h1>Conway's Game of Life</h1>
+  </div>
+  
+  <div class="grid-container">
+    <div class="grid" 
+      style="grid-template-columns: repeat({GRID_COLS}, 1fr);"
+      on:mouseup={handleMouseUp}
+      on:mouseleave={handleMouseLeave}>
+      {#each Array(GRID_ROWS) as _, row}
+        {#each Array(GRID_COLS) as _, col}
+          <div 
+            class="cell {getCellClass(grid[row][col])}"
+            on:mousedown={() => handleMouseDown(row, col)}
+            on:mousemove={() => handleMouseMove(row, col)}
+          ></div>
+        {/each}
+      {/each}
+    </div>
+  </div>
+
+  <div class="controls-container">
+    <div class="top-controls">
+      <div class="generation-info">
+        <p>Generation: {generation}</p>
+      </div>
+      
+      <div class="controls">
+        <button on:click={toggleRunning} class="main-btn">
+          {isRunning ? 'Pause' : 'Start'}
+        </button>
+        <button on:click={step} disabled={isRunning}>Step</button>
+        <button on:click={reset}>Reset</button>
+        <button on:click={randomize}>Randomize</button>
+      </div>
+    </div>
+    
+    <div class="speed-control">
+      <label for="speed">Speed:</label>
+      <input
+        id="speed"
+        type="range"
+        min="50"
+        max="500"
+        step="10"
+        bind:value={speed}
+      />
+      <span>{speed}ms</span>
+    </div>
+  </div>
+</main>
+
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+  }
+  
+  main {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+      Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    overflow: hidden;
+    box-sizing: border-box;
+    position: relative;
+  }
+  
+  .title-container {
+    position: fixed;
+    top: 20px;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+  }
+  
+  h1 {
+    text-align: center;
+    margin: 0;
+    padding: 10px 30px;
+    color: #333;
+    font-size: 1.8rem;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: inline-block;
+  }
+  
+  .grid-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(160, 1fr);
+    grid-template-rows: repeat(100, 1fr);
+    width: 100%;
+    height: 100%;
+    border: none;
+    background-color: white;
+    aspect-ratio: 16/10;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  
+  .cell {
+    border: 0.5px solid #eee;
+    background-color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    aspect-ratio: 1/1;
+  }
+  
+  .cell.alive {
+    background-color: #4a7dff; /* Blue for living cells */
+    border-color: #3a6aee;
+  }
+  
+  .cell.dead {
+    background-color: #63d471; /* Green for dead cells */
+    border-color: #53c461;
+  }
+  
+  .controls-container {
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0 auto;
+    padding: 15px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 800px;
+    z-index: 10;
+  }
+  
+  .top-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .generation-info {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #555;
+    margin: 0;
+  }
+  
+  .generation-info p {
+    margin: 0;
+  }
+  
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  button {
+    padding: 8px 12px;
+    background-color: #e0e0e0;
+    color: #333;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  button:hover {
+    background-color: #d0d0d0;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+  }
+  
+  button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  button:disabled {
+    background-color: #f0f0f0;
+    color: #999;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+  
+  .main-btn {
+    background-color: #4a7dff;
+    color: white;
+    padding: 8px 16px;
+  }
+  
+  .main-btn:hover {
+    background-color: #3a6aee;
+  }
+  
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+  }
+  
+  .speed-control input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    background: #ddd;
+    border-radius: 4px;
+    outline: none;
+    min-width: 150px;
+  }
+  
+  .speed-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4a7dff;
+    cursor: pointer;
+  }
+  
+  @media (max-width: 768px) {
+    .top-controls {
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .controls {
+      justify-content: center;
+    }
+    
+    .cell {
+      border-width: 0.5px;
+    }
+  }
+</style>
+
+================
+File: src/app.d.ts
+================
+// See https://svelte.dev/docs/kit/types#app.d.ts
+// for information about these interfaces
+declare global {
+	namespace App {
+		// interface Error {}
+		// interface Locals {}
+		// interface PageData {}
+		// interface PageState {}
+		// interface Platform {}
+	}
+}
+
+export {};
+
+================
+File: src/app.html
+================
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
+
+================
+File: .gitignore
+================
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+================
+File: .npmrc
+================
+engine-strict=true
+
+================
+File: .prettierignore
+================
+# Package Managers
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
+
+================
+File: .prettierrc
+================
+{
+	"useTabs": true,
+	"singleQuote": true,
+	"trailingComma": "none",
+	"printWidth": 100,
+	"plugins": ["prettier-plugin-svelte"],
+	"overrides": [
+		{
+			"files": "*.svelte",
+			"options": {
+				"parser": "svelte"
+			}
+		}
+	]
+}
+
+================
+File: eslint.config.js
+================
+import prettier from 'eslint-config-prettier';
+import js from '@eslint/js';
+import { includeIgnoreFile } from '@eslint/compat';
+import svelte from 'eslint-plugin-svelte';
+import globals from 'globals';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript-eslint';
+import svelteConfig from './svelte.config.js';
+const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
+
+export default ts.config(
+	includeIgnoreFile(gitignorePath),
+	js.configs.recommended,
+	...ts.configs.recommended,
+	...svelte.configs.recommended,
+	prettier,
+	...svelte.configs.prettier,
+	{
+		languageOptions: {
+			globals: {
+				...globals.browser,
+				...globals.node
+			}
+		}
+	},
+	{
+		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
+		ignores: ['eslint.config.js', 'svelte.config.js'],
+
+		languageOptions: {
+			parserOptions: {
+				projectService: true,
+				extraFileExtensions: ['.svelte'],
+				parser: ts.parser,
+				svelteConfig
+			}
+		}
+	}
+);
+
+================
+File: package.json
+================
+{
+	"name": "game-of-life",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"format": "prettier --write .",
+		"lint": "prettier --check . && eslint ."
+	},
+	"devDependencies": {
+		"@eslint/compat": "^1.2.5",
+		"@eslint/js": "^9.18.0",
+		"@sveltejs/adapter-static": "^3.0.8",
+		"@sveltejs/kit": "^2.16.0",
+		"@sveltejs/vite-plugin-svelte": "^5.0.0",
+		"eslint": "^9.18.0",
+		"eslint-config-prettier": "^10.0.1",
+		"eslint-plugin-svelte": "^3.0.0",
+		"globals": "^16.0.0",
+		"prettier": "^3.4.2",
+		"prettier-plugin-svelte": "^3.3.3",
+		"svelte": "^5.0.0",
+		"svelte-check": "^4.0.0",
+		"typescript": "^5.0.0",
+		"typescript-eslint": "^8.20.0",
+		"vite": "^6.0.0"
+	}
+}
+
+================
+File: README.md
+================
+# sv
+
+Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+
+## Creating a project
+
+If you're seeing this, you've probably already done this step. Congrats!
+
+```bash
+# create a new project in the current directory
+npx sv create
+
+# create a new project in my-app
+npx sv create my-app
+```
+
+## Developing
+
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+
+```bash
+npm run dev
+
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
+```
+
+## Building
+
+To create a production version of your app:
+
+```bash
+npm run build
+```
+
+You can preview the production build with `npm run preview`.
+
+> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+
+================
+File: svelte.config.js
+================
+import adapter from '@sveltejs/adapter-static';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+/** @type {import('@sveltejs/kit').Config} */
+const config = {
+	// Consult https://svelte.dev/docs/kit/integrations
+	// for more information about preprocessors
+	preprocess: vitePreprocess(),
+
+	kit: {
+		adapter: adapter()
+	}
+};
+
+export default config;
+
+================
+File: tsconfig.json
+================
+{
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"strict": true,
+		"moduleResolution": "bundler"
+	}
+	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
+	// except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
+	//
+	// If you want to overwrite includes/excludes, make sure to copy over the relevant includes/excludes
+	// from the referenced tsconfig.json - TypeScript does not merge them in
+}
+
+================
+File: vite.config.ts
+================
+import { sveltekit } from '@sveltejs/kit/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+	plugins: [sveltekit()]
+});
+
+
+
+================================================================
+End of Codebase
+================================================================
