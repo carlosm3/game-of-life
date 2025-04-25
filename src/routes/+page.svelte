@@ -11,7 +11,7 @@
 	let cellSize = 0;
 	let game: GameOfLife;
 	let grid: number[][] = [];
-	let gameTimer: number;
+	let gameTimer: number | undefined;
 
 	// Calculate grid dimensions to fill viewport with square cells
 	function calculateGrid() {
@@ -58,8 +58,8 @@
 		// Initialize or reinitialize game
 		game = new GameOfLife(rows, cols);
 		grid = game.getGrid();
-		generation = 0;
-		
+		// Generation is now tracked inside the GameOfLife class
+
 		// Restart loop if we were running
 		if (isRunning) {
 			startGameLoop();
@@ -68,43 +68,34 @@
 
 	// Track if mouse is down for drag operations
 	let isMouseDown = false;
-	
+
 	// Handle cell click (toggle only between white and blue)
 	function handleCellClick(row: number, col: number) {
-		// Get current state
-		const currentState = grid[row]?.[col] || 0;
-		
-		// Toggle only between never lived (0) and alive (1)
-		const newState = currentState === 1 ? 0 : 1;
-		
-		// Have to directly modify the grid because setCell would turn blue cells green
-		if (row >= 0 && row < rows && col >= 0 && col < cols) {
-			// Directly modify the cell's value in the game's grid
-			game['grid'][row][col] = newState;
-			// Update our local grid reference
-			grid = game.getGrid();
-		}
+		// Use the new toggleCellAliveOnly method
+		game.toggleCellAliveOnly(row, col);
+		// Update our local grid reference
+		grid = game.getGrid();
 	}
-	
+
 	// Handle cell activation (only make alive, don't toggle)
 	function handleCellActivate(row: number, col: number) {
 		game.setCell(row, col, true); // Always set to alive
 		grid = game.getGrid();
 	}
-	
+
 	// Handle mouse down on a cell
 	function handleMouseDown(row: number, col: number) {
 		isMouseDown = true;
 		handleCellClick(row, col); // Toggle on initial click
 	}
-	
+
 	// Handle mouse over a cell
 	function handleMouseOver(row: number, col: number) {
 		if (isMouseDown) {
 			handleCellActivate(row, col); // Only make alive on drag
 		}
 	}
-	
+
 	// Handle mouse up
 	function handleMouseUp() {
 		isMouseDown = false;
@@ -113,11 +104,11 @@
 	// Start game loop
 	function startGameLoop() {
 		if (gameTimer) clearInterval(gameTimer);
-		
+
 		gameTimer = setInterval(() => {
 			game.nextGeneration();
 			grid = game.getGrid();
-			generation++;
+			// Generation increment is now handled in the GameOfLife class
 		}, speed);
 	}
 
@@ -125,7 +116,7 @@
 	onMount(() => {
 		calculateGrid();
 		window.addEventListener('resize', calculateGrid);
-		
+
 		// Add global mouse up listener for drag operations
 		window.addEventListener('mouseup', handleMouseUp);
 
@@ -136,7 +127,7 @@
 		};
 	});
 
-	let generation = 0;
+	// Generation is now tracked inside the GameOfLife class
 	let speed = 400; // Default speed in milliseconds
 	let isRunning = false;
 
@@ -156,9 +147,8 @@
 	function resetGame() {
 		// Stop the game first
 		stopGame();
-		
-		// Then reset
-		generation = 0;
+
+		// Then reset (GameOfLife.reset now also resets the generation counter)
 		game.reset();
 		grid = game.getGrid();
 	}
@@ -171,9 +161,12 @@
 	// Get cell class based on state
 	function getCellClass(state: number): string {
 		switch (state) {
-			case 1: return 'alive'; // Blue
-			case 2: return 'dead';  // Green
-			default: return '';    // White (never lived)
+			case 1:
+				return 'alive'; // Blue
+			case 2:
+				return 'dead'; // Green
+			default:
+				return ''; // White (never lived)
 		}
 	}
 
@@ -192,8 +185,8 @@
 		<div class="grid">
 			{#each Array(rows) as _, row}
 				{#each Array(cols) as _, col}
-					<div 
-						class="cell {getCellClass(grid[row]?.[col] || 0)}" 
+					<div
+						class="cell {getCellClass(grid[row]?.[col] || 0)}"
 						on:mousedown={() => handleMouseDown(row, col)}
 						on:mouseover={() => handleMouseOver(row, col)}
 					></div>
@@ -206,7 +199,7 @@
 <div class="controls-container">
 	<div class="controls-content">
 		<div class="generation-counter">
-			Generation: {generation}
+			Generation: {game?.getGeneration() ?? 0}
 		</div>
 		<div class="speed-slider">
 			<label for="speed">Speed:</label>
@@ -277,11 +270,11 @@
 		cursor: pointer;
 		transition: background-color 0.15s ease;
 	}
-	
+
 	.cell.alive {
 		background: #2563eb; /* Blue for alive cells */
 	}
-	
+
 	.cell.dead {
 		background: #22c55e; /* Green for dead cells */
 	}
@@ -327,7 +320,6 @@
 		max-width: 420px;
 		width: 100%;
 		pointer-events: auto;
-		font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
 		box-sizing: border-box;
 	}
 	@media (min-width: 600px) {
@@ -351,26 +343,8 @@
 		justify-content: center;
 		pointer-events: none;
 	}
-	.controls-content {
-		background: rgba(61, 61, 61, 0.9);
-		color: #fff;
-		border-radius: 12px;
-		box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-		padding: 18px 36px;
-		display: flex;
-		flex-direction: column;
-		gap: 14px;
-		align-items: center;
-		min-width: 320px;
-		pointer-events: auto;
-		font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
-	}
-	.controls-buttons button,
-	.speed-slider label,
-	.speed-slider span,
-	.generation-counter {
-		font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
-	}
+	/* Controls content styles defined above */
+	/* All font-family is already set in the global reset */
 	.generation-counter {
 		font-size: 1.1rem;
 		font-weight: 500;
@@ -422,12 +396,5 @@
 	.controls-buttons button:not(:disabled):hover,
 	.controls-buttons button:not(:disabled):focus {
 		background: #353b47;
-	}
-	.controls-buttons button:disabled {
-		background: #b3b3b3;
-		cursor: not-allowed;
-	}
-	.controls-buttons button:not(:disabled):hover {
-		background: #1749b1;
 	}
 </style>
