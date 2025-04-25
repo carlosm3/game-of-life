@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conway's Game of Life</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="title-container">
+        <h1>Conway's<br />Game of Life</h1>
+    </div>
+    
+    <main>
+        <div class="grid-container">
+            <div class="grid" id="grid">
+                <!-- Grid cells will be created dynamically with JavaScript -->
+            </div>
+        </div>
+    </main>
+    
+    <div class="controls-container">
+        <div class="controls-content">
+            <div class="generation-counter">
+                Generation: <span id="generation-count">0</span>
+            </div>
+            <div class="speed-slider">
+                <label for="speed">Speed:</label>
+                <input id="speed" type="range" min="50" max="1000" step="50" value="400">
+                <span id="speed-value">(400 ms)</span>
+            </div>
+            <div class="controls-buttons">
+                <button id="start-button">Start</button>
+                <button id="stop-button" disabled>Stop</button>
+                <button id="reset-button">Reset</button>
+                <button id="randomize-button">Randomize</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
